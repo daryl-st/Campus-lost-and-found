@@ -1,0 +1,1 @@
+<!-- Processes form, redirects to homepage -->
