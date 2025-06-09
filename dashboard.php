@@ -7,23 +7,52 @@ if (!isset($_SESSION['user_id'])) {
 }
 require 'includes/db.php';
 
-// Fetch user's posted items
-$stmt = $pdo->prepare("SELECT * FROM found_items WHERE user_id = ? ORDER BY created_at DESC");
-$stmt->execute([$_SESSION['user_id']]);
-$userItems = $stmt->fetchAll();
+// Get success/error messages
+$success_message = $_SESSION['success_message'] ?? '';
+$error_message = $_SESSION['error_message'] ?? '';
+unset($_SESSION['success_message'], $_SESSION['error_message']);
 
-// Fetch recent items (not posted by the current user)
-$stmt = $pdo->prepare("SELECT * FROM found_items WHERE user_id != ? ORDER BY created_at DESC LIMIT 5");
-$stmt->execute([$_SESSION['user_id']]);
-$recentItems = $stmt->fetchAll();
-
-// Get stats
-$totalItems = count($userItems);
-$claimedItems = 0; // You would need to add a 'status' column to track this
-foreach ($userItems as $item) {
-    if (isset($item['status']) && $item['status'] === 'claimed') {
-        $claimedItems++;
+try {
+    // Check if status column exists, if not add it
+    $stmt = $pdo->query("SHOW COLUMNS FROM found_items LIKE 'status'");
+    if ($stmt->rowCount() == 0) {
+        // Add status column if it doesn't exist
+        $pdo->exec("ALTER TABLE found_items ADD COLUMN status ENUM('active', 'claimed', 'removed') DEFAULT 'active'");
+        $pdo->exec("UPDATE found_items SET status = 'active' WHERE status IS NULL");
     }
+
+    // Fetch user's posted items (only active ones)
+    $stmt = $pdo->prepare("SELECT * FROM found_items WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC");
+    $stmt->execute([$_SESSION['user_id']]);
+    $userItems = $stmt->fetchAll();
+
+    // Fetch recent items (not posted by the current user, only active ones)
+    $stmt = $pdo->prepare("SELECT * FROM found_items WHERE user_id != ? AND status = 'active' ORDER BY created_at DESC LIMIT 5");
+    $stmt->execute([$_SESSION['user_id']]);
+    $recentItems = $stmt->fetchAll();
+
+    // Get stats
+    $totalItems = count($userItems);
+
+    // Get claimed items count
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM found_items WHERE user_id = ? AND status = 'claimed'");
+    $stmt->execute([$_SESSION['user_id']]);
+    $claimedItems = $stmt->fetchColumn();
+
+} catch (PDOException $e) {
+    // If there's still an error, fall back to queries without status
+    $stmt = $pdo->prepare("SELECT * FROM found_items WHERE user_id = ? ORDER BY created_at DESC");
+    $stmt->execute([$_SESSION['user_id']]);
+    $userItems = $stmt->fetchAll();
+
+    $stmt = $pdo->prepare("SELECT * FROM found_items WHERE user_id != ? ORDER BY created_at DESC LIMIT 5");
+    $stmt->execute([$_SESSION['user_id']]);
+    $recentItems = $stmt->fetchAll();
+
+    $totalItems = count($userItems);
+    $claimedItems = 0;
+    
+    $error_message = "Database schema needs updating. Please run the database migration.";
 }
 ?>
 
@@ -52,6 +81,21 @@ foreach ($userItems as $item) {
     </header>
 
     <main class="container">
+        <?php if ($success_message): ?>
+            <div class="success-alert">
+                <p><?= htmlspecialchars($success_message) ?></p>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($error_message): ?>
+            <div class="error-alert">
+                <p><?= htmlspecialchars($error_message) ?></p>
+                <?php if (strpos($error_message, 'schema') !== false): ?>
+                    <p><a href="check_database.php" style="color: #c53030; text-decoration: underline;">Click here to fix database schema</a></p>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
         <div class="dashboard-welcome">
             <div class="welcome-content">
                 <h1>Welcome to Your Dashboard</h1>
@@ -66,7 +110,7 @@ foreach ($userItems as $item) {
                     <div class="stat-card">
                         <div class="stat-icon">📦</div>
                         <div class="stat-value"><?= $totalItems ?></div>
-                        <div class="stat-label">Items Posted</div>
+                        <div class="stat-label">Active Items</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">✅</div>
@@ -75,7 +119,7 @@ foreach ($userItems as $item) {
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">🏆</div>
-                        <div class="stat-value"><?= $totalItems > 0 ? '👍' : '-' ?></div>
+                        <div class="stat-value"><?= ($totalItems + $claimedItems) > 0 ? '👍' : '-' ?></div>
                         <div class="stat-label">Community Helper</div>
                     </div>
                 </div>
@@ -195,5 +239,27 @@ foreach ($userItems as $item) {
             </div>
         </div>
     </footer>
+
+    <style>
+        .success-alert {
+            background: #c6f6d5;
+            color: #2f855a;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
+            border-left: 4px solid #38a169;
+        }
+
+        .error-alert {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
+            border-left: 4px solid #e53e3e;
+        }
+    </style>
 </body>
 </html>

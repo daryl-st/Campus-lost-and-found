@@ -1,34 +1,53 @@
-<?php 
+<?php
 session_start();
 require 'includes/db.php';
 
-$errors = [];
+$error = '';
+$success = '';
+$token = $_GET['token'] ?? '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
-    $username_email = trim(htmlspecialchars($_POST['username_email']));
+if (empty($token)) {
+    header("Location: forgot_password.php");
+    exit();
+}
+
+// Verify token
+try {
+    $stmt = $pdo->prepare("SELECT email FROM password_resets WHERE token = ? AND expires_at > NOW()");
+    $stmt->execute([$token]);
+    $reset_request = $stmt->fetch();
+    
+    if (!$reset_request) {
+        $error = "Invalid or expired reset token.";
+    }
+} catch (PDOException $e) {
+    $error = "Database error: " . $e->getMessage();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_password']) && !$error) {
     $password = $_POST['password'];
-
-    if (empty($username_email)) $errors[] = "Username/Email is required";
-    if (empty($password)) $errors[] = "Password is required";
-
-    if (empty($errors)) {
+    $confirm_password = $_POST['confirm_password'];
+    
+    if (empty($password)) {
+        $error = "Password is required";
+    } elseif (strlen($password) < 8) {
+        $error = "Password must be at least 8 characters";
+    } elseif ($password !== $confirm_password) {
+        $error = "Passwords do not match";
+    } else {
         try {
-            $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? OR username = ?");
-            $stmt->execute([$username_email, $username_email]);
-            $user = $stmt->fetch();
-
-            if ($user && password_verify($password, $user['password'])) {
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['email'] = $user['email'];
-                $_SESSION['is_admin'] = $user['is_admin'] ?? 0;
-                header("Location: dashboard.php");
-                exit();
-            } else {
-                $errors[] = "Invalid credentials";
-            }
+            // Update password
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE email = ?");
+            $stmt->execute([$hashed_password, $reset_request['email']]);
+            
+            // Delete used token
+            $stmt = $pdo->prepare("DELETE FROM password_resets WHERE token = ?");
+            $stmt->execute([$token]);
+            
+            $success = "Password updated successfully! You can now login with your new password.";
         } catch (PDOException $e) {
-            $errors[] = "Database error: " . $e->getMessage();
+            $error = "Database error: " . $e->getMessage();
         }
     }
 }
@@ -39,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Campus Lost & Found</title>
+    <title>Reset Password | Campus Lost & Found</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -58,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             padding: 20px;
         }
 
-        .login-container {
+        .reset-container {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border-radius: 20px;
@@ -107,6 +126,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             border-left: 4px solid #e53e3e;
         }
 
+        .success-msg {
+            background: #c6f6d5;
+            color: #2f855a;
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            border-left: 4px solid #38a169;
+        }
+
         .form-group {
             margin-bottom: 20px;
         }
@@ -152,43 +181,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 
         .password-toggle:hover {
             color: #4a5568;
-        }
-
-        .form-options {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-        }
-
-        .remember-me {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .remember-me input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            accent-color: #667eea;
-        }
-
-        .remember-me label {
-            color: #4a5568;
-            font-size: 0.9rem;
-            cursor: pointer;
-        }
-
-        .forgot-link {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: color 0.3s ease;
-        }
-
-        .forgot-link:hover {
-            color: #764ba2;
         }
 
         .submit-btn {
@@ -257,7 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         }
 
         @media (max-width: 480px) {
-            .login-container {
+            .reset-container {
                 padding: 30px 25px;
             }
             
@@ -272,60 +264,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 <body>
     <a href="index.php" class="home-link">← Back to Home</a>
     
-    <div class="login-container">
+    <div class="reset-container">
         <div class="logo-section">
             <a href="index.php" class="logo">🔍 Campus Lost & Found</a>
-            <h1 class="welcome-text">Welcome Back!</h1>
-            <p class="subtitle">Please sign in to your account</p>
+            <h1 class="welcome-text">Reset Password</h1>
+            <p class="subtitle">Enter your new password</p>
         </div>
 
-        <?php if (!empty($errors)): ?>
+        <?php if ($error): ?>
             <div class="error-msg">
-                <?php foreach ($errors as $error): ?>
-                    <p><?= htmlspecialchars($error) ?></p>
-                <?php endforeach; ?>
+                <p><?= htmlspecialchars($error) ?></p>
             </div>
         <?php endif; ?>
 
+        <?php if ($success): ?>
+            <div class="success-msg">
+                <p><?= htmlspecialchars($success) ?></p>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!$error && !$success): ?>
         <form method="POST">
             <div class="form-group">
-                <label for="username_email" class="form-label">Email or Username</label>
+                <label for="password" class="form-label">New Password</label>
                 <div class="input-container">
-                    <input type="text" id="username_email" name="username_email" class="form-input" 
-                           placeholder="Enter your email or username" required 
-                           value="<?= htmlspecialchars($_POST['username_email'] ?? '') ?>">
+                    <input type="password" id="password" name="password" class="form-input" 
+                           placeholder="Enter new password" required>
+                    <span class="password-toggle" onclick="togglePassword('password')">👁️</span>
                 </div>
             </div>
 
             <div class="form-group">
-                <label for="password" class="form-label">Password</label>
+                <label for="confirm_password" class="form-label">Confirm New Password</label>
                 <div class="input-container">
-                    <input type="password" id="password" name="password" class="form-input" 
-                           placeholder="Enter your password" required>
-                    <span class="password-toggle" onclick="togglePassword()">👁️</span>
+                    <input type="password" id="confirm_password" name="confirm_password" class="form-input" 
+                           placeholder="Confirm new password" required>
+                    <span class="password-toggle" onclick="togglePassword('confirm_password')">👁️</span>
                 </div>
             </div>
 
-            <div class="form-options">
-                <div class="remember-me">
-                    <input type="checkbox" id="remember" name="remember">
-                    <label for="remember">Remember me</label>
-                </div>
-                <a href="forgot_password.php" class="forgot-link">Forgot password?</a>
-            </div>
-
-            <button type="submit" name="login" class="submit-btn">Sign In</button>
+            <button type="submit" name="update_password" class="submit-btn">Update Password</button>
         </form>
+        <?php endif; ?>
 
         <div class="auth-footer">
-            <p>Don't have an account? <a href="register.php">Create one here</a></p>
+            <p>Remember your password? <a href="login.php">Sign in here</a></p>
         </div>
     </div>
 
     <script>
-        function togglePassword() {
-            const passwordInput = document.getElementById("password");
-            const toggleIcon = document.querySelector(".password-toggle");
+        function togglePassword(fieldId) {
+            const passwordInput = document.getElementById(fieldId);
+            const toggleIcon = passwordInput.nextElementSibling;
             
             if (passwordInput.type === "password") {
                 passwordInput.type = "text";

@@ -1,1 +1,0 @@
-<!-- Handles auth (redirects after success) -->

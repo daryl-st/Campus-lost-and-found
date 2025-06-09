@@ -6,8 +6,24 @@ if (!isset($_SESSION['user_id'])) {
 }
 require 'includes/db.php';
 
+$id = $_GET['id'] ?? 0;
 $errors = [];
 $success = '';
+
+// Fetch item details
+try {
+    $stmt = $pdo->prepare("SELECT * FROM found_items WHERE id = ? AND user_id = ?");
+    $stmt->execute([$id, $_SESSION['user_id']]);
+    $item = $stmt->fetch();
+
+    if (!$item) {
+        header("Location: dashboard.php");
+        exit();
+    }
+} catch (PDOException $e) {
+    header("Location: dashboard.php");
+    exit();
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title']);
@@ -25,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($description)) $errors[] = "Description is required";
 
     // Handle image upload
-    $image_path = null;
+    $image_path = $item['image_path']; // Keep existing image by default
     if ($image['error'] === 0) {
         $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
         $max_size = 5 * 1024 * 1024; // 5MB
@@ -40,26 +56,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mkdir('uploads', 0777, true);
             }
 
+            // Delete old image if it exists
+            if ($item['image_path'] && file_exists($item['image_path'])) {
+                unlink($item['image_path']);
+            }
+
             $ext = pathinfo($image['name'], PATHINFO_EXTENSION);
             $filename = uniqid() . '.' . $ext;
             $image_path = 'uploads/' . $filename;
 
             if (!move_uploaded_file($image['tmp_name'], $image_path)) {
                 $errors[] = "Failed to upload image";
-                $image_path = null;
+                $image_path = $item['image_path']; // Revert to old image
             }
         }
     }
 
     if (empty($errors)) {
         try {
-            $stmt = $pdo->prepare("INSERT INTO found_items (user_id, title, category, location, found_datetime, description, image_path, created_at)
-                                   VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
-            $stmt->execute([$_SESSION['user_id'], $title, $category, $location, $datetime, $description, $image_path]);
+            $stmt = $pdo->prepare("UPDATE found_items SET title = ?, category = ?, location = ?, found_datetime = ?, description = ?, image_path = ?, updated_at = NOW() WHERE id = ? AND user_id = ?");
+            $stmt->execute([$title, $category, $location, $datetime, $description, $image_path, $id, $_SESSION['user_id']]);
 
-            $success = "Item posted successfully!";
-            // Clear form data
-            $_POST = [];
+            $success = "Item updated successfully!";
+            // Refresh item data
+            $item['title'] = $title;
+            $item['category'] = $category;
+            $item['location'] = $location;
+            $item['found_datetime'] = $datetime;
+            $item['description'] = $description;
+            $item['image_path'] = $image_path;
         } catch (PDOException $e) {
             $errors[] = "Database error: " . $e->getMessage();
         }
@@ -72,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Post Found Item | Campus Lost & Found</title>
+    <title>Edit Item | Campus Lost & Found</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -293,6 +318,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             display: none;
         }
 
+        .current-image {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .current-image img {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .current-image-label {
+            display: block;
+            margin-bottom: 10px;
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
         .image-preview {
             margin-top: 15px;
             text-align: center;
@@ -415,8 +459,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <main class="container">
         <div class="page-header">
-            <h1 class="page-title">Post Found Item</h1>
-            <p class="page-subtitle">Help someone find their lost belongings</p>
+            <h1 class="page-title">Edit Item</h1>
+            <p class="page-subtitle">Update your found item details</p>
         </div>
 
         <div class="form-card">
@@ -440,19 +484,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label for="title" class="form-label">Item Title <span class="required">*</span></label>
                         <input type="text" id="title" name="title" class="form-input" 
                                placeholder="e.g., iPhone 13 Pro, Blue Backpack" required 
-                               value="<?= htmlspecialchars($_POST['title'] ?? '') ?>">
+                               value="<?= htmlspecialchars($item['title']) ?>">
                     </div>
                     <div class="form-group">
                         <label for="category" class="form-label">Category <span class="required">*</span></label>
                         <select id="category" name="category" class="form-select" required>
                             <option value="">Select a category</option>
-                            <option value="Electronics" <?= ($_POST['category'] ?? '') === 'Electronics' ? 'selected' : '' ?>>Electronics</option>
-                            <option value="Clothing" <?= ($_POST['category'] ?? '') === 'Clothing' ? 'selected' : '' ?>>Clothing</option>
-                            <option value="Accessories" <?= ($_POST['category'] ?? '') === 'Accessories' ? 'selected' : '' ?>>Accessories</option>
-                            <option value="Documents" <?= ($_POST['category'] ?? '') === 'Documents' ? 'selected' : '' ?>>Documents</option>
-                            <option value="Books" <?= ($_POST['category'] ?? '') === 'Books' ? 'selected' : '' ?>>Books</option>
-                            <option value="Keys" <?= ($_POST['category'] ?? '') === 'Keys' ? 'selected' : '' ?>>Keys</option>
-                            <option value="Others" <?= ($_POST['category'] ?? '') === 'Others' ? 'selected' : '' ?>>Others</option>
+                            <option value="Electronics" <?= $item['category'] === 'Electronics' ? 'selected' : '' ?>>Electronics</option>
+                            <option value="Clothing" <?= $item['category'] === 'Clothing' ? 'selected' : '' ?>>Clothing</option>
+                            <option value="Accessories" <?= $item['category'] === 'Accessories' ? 'selected' : '' ?>>Accessories</option>
+                            <option value="Documents" <?= $item['category'] === 'Documents' ? 'selected' : '' ?>>Documents</option>
+                            <option value="Books" <?= $item['category'] === 'Books' ? 'selected' : '' ?>>Books</option>
+                            <option value="Keys" <?= $item['category'] === 'Keys' ? 'selected' : '' ?>>Keys</option>
+                            <option value="Others" <?= $item['category'] === 'Others' ? 'selected' : '' ?>>Others</option>
                         </select>
                     </div>
                 </div>
@@ -462,39 +506,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label for="location" class="form-label">Found Location <span class="required">*</span></label>
                         <input type="text" id="location" name="location" class="form-input" 
                                placeholder="e.g., Library, Cafeteria, Building A" required 
-                               value="<?= htmlspecialchars($_POST['location'] ?? '') ?>">
+                               value="<?= htmlspecialchars($item['location']) ?>">
                     </div>
                     <div class="form-group">
                         <label for="found_datetime" class="form-label">Date & Time Found <span class="required">*</span></label>
                         <input type="datetime-local" id="found_datetime" name="found_datetime" class="form-input" required 
-                               value="<?= htmlspecialchars($_POST['found_datetime'] ?? '') ?>">
+                               value="<?= date('Y-m-d\TH:i', strtotime($item['found_datetime'])) ?>">
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label for="description" class="form-label">Description <span class="required">*</span></label>
                     <textarea id="description" name="description" class="form-textarea" 
-                              placeholder="Provide detailed description of the item, including color, brand, condition, and any distinguishing features..." required><?= htmlspecialchars($_POST['description'] ?? '') ?></textarea>
+                              placeholder="Provide detailed description of the item, including color, brand, condition, and any distinguishing features..." required><?= htmlspecialchars($item['description']) ?></textarea>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Item Photo</label>
+                    
+                    <?php if (!empty($item['image_path']) && file_exists($item['image_path'])): ?>
+                        <div class="current-image">
+                            <span class="current-image-label">Current Image:</span>
+                            <img src="<?= htmlspecialchars($item['image_path']) ?>" alt="Current item image">
+                        </div>
+                    <?php endif; ?>
+                    
                     <div class="upload-section" onclick="document.getElementById('image').click();">
                         <div class="upload-icon">📷</div>
-                        <div class="upload-text">Click to upload or drag and drop</div>
-                        <div class="upload-hint">PNG, JPG, GIF (MAX. 5MB)</div>
+                        <div class="upload-text">Click to upload new image or drag and drop</div>
+                        <div class="upload-hint">PNG, JPG, GIF (MAX. 5MB) - Leave empty to keep current image</div>
                         <input type="file" id="image" name="image" class="file-input" accept="image/*" onchange="previewImage(this)">
                     </div>
                     <div id="image-preview" class="image-preview" style="display: none;">
                         <img id="preview-img" class="preview-image" src="/placeholder.svg" alt="Preview">
                         <br>
-                        <a href="#" class="remove-image" onclick="removeImage()">Remove Image</a>
+                        <a href="#" class="remove-image" onclick="removeImage()">Remove New Image</a>
                     </div>
                 </div>
 
                 <div class="form-actions">
-                    <a href="dashboard.php" class="btn btn-secondary">Cancel</a>
-                    <button type="submit" class="btn btn-primary">Post Item</button>
+                    <a href="item_detail.php?id=<?= $item['id'] ?>" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Update Item</button>
                 </div>
             </form>
         </div>

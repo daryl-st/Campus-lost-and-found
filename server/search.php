@@ -1,1 +1,0 @@
-<!-- Renders filtered results as HTML -->

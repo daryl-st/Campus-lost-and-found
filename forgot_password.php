@@ -1,34 +1,63 @@
-<?php 
+<?php
 session_start();
 require 'includes/db.php';
 
-$errors = [];
+$message = '';
+$error = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
-    $username_email = trim(htmlspecialchars($_POST['username_email']));
-    $password = $_POST['password'];
-
-    if (empty($username_email)) $errors[] = "Username/Email is required";
-    if (empty($password)) $errors[] = "Password is required";
-
-    if (empty($errors)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reset_password'])) {
+    $email = trim(htmlspecialchars($_POST['email']));
+    
+    if (empty($email)) {
+        $error = "Email is required";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Invalid email format";
+    } else {
         try {
-            $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? OR username = ?");
-            $stmt->execute([$username_email, $username_email]);
+            // Check if email exists
+            $stmt = $pdo->prepare("SELECT id, username FROM users WHERE email = ?");
+            $stmt->execute([$email]);
             $user = $stmt->fetch();
-
-            if ($user && password_verify($password, $user['password'])) {
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['email'] = $user['email'];
-                $_SESSION['is_admin'] = $user['is_admin'] ?? 0;
-                header("Location: dashboard.php");
-                exit();
+            
+            if ($user) {
+                // Generate reset token
+                $reset_token = bin2hex(random_bytes(32));
+                $expires_at = date('Y-m-d H:i:s', strtotime('+1 hour'));
+                
+                // Store reset token in database (you'll need to create this table)
+                try {
+                    $stmt = $pdo->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?) 
+                                          ON DUPLICATE KEY UPDATE token = ?, expires_at = ?");
+                    $stmt->execute([$email, $reset_token, $expires_at, $reset_token, $expires_at]);
+                    
+                    // In a real application, you would send an email here
+                    // For demo purposes, we'll just show the reset link
+                    $reset_link = "http://" . $_SERVER['HTTP_HOST'] . "/reset_password.php?token=" . $reset_token;
+                    $message = "Password reset instructions have been sent to your email. For demo purposes, here's your reset link: <a href='$reset_link'>Reset Password</a>";
+                    
+                } catch (PDOException $e) {
+                    // Create the table if it doesn't exist
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS password_resets (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        email VARCHAR(255) NOT NULL,
+                        token VARCHAR(255) NOT NULL,
+                        expires_at DATETIME NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE KEY unique_email (email)
+                    )");
+                    
+                    // Try again
+                    $stmt = $pdo->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)");
+                    $stmt->execute([$email, $reset_token, $expires_at]);
+                    
+                    $reset_link = "http://" . $_SERVER['HTTP_HOST'] . "/reset_password.php?token=" . $reset_token;
+                    $message = "Password reset instructions have been sent to your email. For demo purposes, here's your reset link: <a href='$reset_link'>Reset Password</a>";
+                }
             } else {
-                $errors[] = "Invalid credentials";
+                $message = "If an account with that email exists, you will receive password reset instructions.";
             }
         } catch (PDOException $e) {
-            $errors[] = "Database error: " . $e->getMessage();
+            $error = "Database error: " . $e->getMessage();
         }
     }
 }
@@ -39,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Campus Lost & Found</title>
+    <title>Forgot Password | Campus Lost & Found</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -58,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             padding: 20px;
         }
 
-        .login-container {
+        .forgot-container {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border-radius: 20px;
@@ -107,6 +136,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             border-left: 4px solid #e53e3e;
         }
 
+        .success-msg {
+            background: #c6f6d5;
+            color: #2f855a;
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            border-left: 4px solid #38a169;
+        }
+
+        .success-msg a {
+            color: #2f855a;
+            font-weight: 600;
+        }
+
         .form-group {
             margin-bottom: 20px;
         }
@@ -117,10 +161,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             color: #2d3748;
             font-weight: 500;
             font-size: 0.95rem;
-        }
-
-        .input-container {
-            position: relative;
         }
 
         .form-input {
@@ -137,58 +177,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .password-toggle {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            cursor: pointer;
-            color: #718096;
-            font-size: 1.2rem;
-            user-select: none;
-        }
-
-        .password-toggle:hover {
-            color: #4a5568;
-        }
-
-        .form-options {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-        }
-
-        .remember-me {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .remember-me input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            accent-color: #667eea;
-        }
-
-        .remember-me label {
-            color: #4a5568;
-            font-size: 0.9rem;
-            cursor: pointer;
-        }
-
-        .forgot-link {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: color 0.3s ease;
-        }
-
-        .forgot-link:hover {
-            color: #764ba2;
         }
 
         .submit-btn {
@@ -257,7 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         }
 
         @media (max-width: 480px) {
-            .login-container {
+            .forgot-container {
                 padding: 30px 25px;
             }
             
@@ -272,69 +260,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 <body>
     <a href="index.php" class="home-link">← Back to Home</a>
     
-    <div class="login-container">
+    <div class="forgot-container">
         <div class="logo-section">
             <a href="index.php" class="logo">🔍 Campus Lost & Found</a>
-            <h1 class="welcome-text">Welcome Back!</h1>
-            <p class="subtitle">Please sign in to your account</p>
+            <h1 class="welcome-text">Forgot Password?</h1>
+            <p class="subtitle">Enter your email to reset your password</p>
         </div>
 
-        <?php if (!empty($errors)): ?>
+        <?php if ($error): ?>
             <div class="error-msg">
-                <?php foreach ($errors as $error): ?>
-                    <p><?= htmlspecialchars($error) ?></p>
-                <?php endforeach; ?>
+                <p><?= htmlspecialchars($error) ?></p>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($message): ?>
+            <div class="success-msg">
+                <p><?= $message ?></p>
             </div>
         <?php endif; ?>
 
         <form method="POST">
             <div class="form-group">
-                <label for="username_email" class="form-label">Email or Username</label>
-                <div class="input-container">
-                    <input type="text" id="username_email" name="username_email" class="form-input" 
-                           placeholder="Enter your email or username" required 
-                           value="<?= htmlspecialchars($_POST['username_email'] ?? '') ?>">
-                </div>
+                <label for="email" class="form-label">Email Address</label>
+                <input type="email" id="email" name="email" class="form-input" 
+                       placeholder="Enter your email address" required 
+                       value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
             </div>
 
-            <div class="form-group">
-                <label for="password" class="form-label">Password</label>
-                <div class="input-container">
-                    <input type="password" id="password" name="password" class="form-input" 
-                           placeholder="Enter your password" required>
-                    <span class="password-toggle" onclick="togglePassword()">👁️</span>
-                </div>
-            </div>
-
-            <div class="form-options">
-                <div class="remember-me">
-                    <input type="checkbox" id="remember" name="remember">
-                    <label for="remember">Remember me</label>
-                </div>
-                <a href="forgot_password.php" class="forgot-link">Forgot password?</a>
-            </div>
-
-            <button type="submit" name="login" class="submit-btn">Sign In</button>
+            <button type="submit" name="reset_password" class="submit-btn">Send Reset Link</button>
         </form>
 
         <div class="auth-footer">
-            <p>Don't have an account? <a href="register.php">Create one here</a></p>
+            <p>Remember your password? <a href="login.php">Sign in here</a></p>
+            <p>Don't have an account? <a href="register.php">Create one</a></p>
         </div>
     </div>
-
-    <script>
-        function togglePassword() {
-            const passwordInput = document.getElementById("password");
-            const toggleIcon = document.querySelector(".password-toggle");
-            
-            if (passwordInput.type === "password") {
-                passwordInput.type = "text";
-                toggleIcon.textContent = "🙈";
-            } else {
-                passwordInput.type = "password";
-                toggleIcon.textContent = "👁️";
-            }
-        }
-    </script>
 </body>
 </html>

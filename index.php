@@ -1,4 +1,5 @@
 <?php
+session_start();
 require 'includes/db.php';
 
 // Search functionality
@@ -7,33 +8,72 @@ $limit = 6; // Increased for better grid display
 $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
 $start = ($page - 1) * $limit;
 
-// Prepare SQL with search filter
-$sql = "SELECT * FROM found_items";
-if (!empty($search)) {
-    $sql .= " WHERE title LIKE :search OR description LIKE :search";
-}
-$sql .= " ORDER BY created_at DESC LIMIT :start, :limit";
+try {
+    // Check if status column exists, if not add it
+    $stmt = $pdo->query("SHOW COLUMNS FROM found_items LIKE 'status'");
+    if ($stmt->rowCount() == 0) {
+        // Add status column if it doesn't exist
+        $pdo->exec("ALTER TABLE found_items ADD COLUMN status ENUM('active', 'claimed', 'removed') DEFAULT 'active'");
+        $pdo->exec("UPDATE found_items SET status = 'active' WHERE status IS NULL");
+    }
 
-$stmt = $pdo->prepare($sql);
-if (!empty($search)) {
-    $stmt->bindValue(':search', '%' . $search . '%', PDO::PARAM_STR);
-}
-$stmt->bindValue(':start', (int)$start, PDO::PARAM_INT);
-$stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
-$stmt->execute();
-$items = $stmt->fetchAll();
+    // Prepare SQL with search filter - only show active items
+    $sql = "SELECT * FROM found_items WHERE status = 'active'";
+    if (!empty($search)) {
+        $sql .= " AND (title LIKE :search OR description LIKE :search)";
+    }
+    $sql .= " ORDER BY created_at DESC LIMIT :start, :limit";
 
-// Get total count for pagination
-$countSql = "SELECT COUNT(*) FROM found_items";
-if (!empty($search)) {
-    $countSql .= " WHERE title LIKE :search OR description LIKE :search";
-    $countStmt = $pdo->prepare($countSql);
-    $countStmt->bindValue(':search', '%' . $search . '%', PDO::PARAM_STR);
-    $countStmt->execute();
-} else {
-    $countStmt = $pdo->query($countSql);
+    $stmt = $pdo->prepare($sql);
+    if (!empty($search)) {
+        $stmt->bindValue(':search', '%' . $search . '%', PDO::PARAM_STR);
+    }
+    $stmt->bindValue(':start', (int)$start, PDO::PARAM_INT);
+    $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+    $stmt->execute();
+    $items = $stmt->fetchAll();
+
+    // Get total count for pagination - only active items
+    $countSql = "SELECT COUNT(*) FROM found_items WHERE status = 'active'";
+    if (!empty($search)) {
+        $countSql .= " AND (title LIKE :search OR description LIKE :search)";
+        $countStmt = $pdo->prepare($countSql);
+        $countStmt->bindValue(':search', '%' . $search . '%', PDO::PARAM_STR);
+        $countStmt->execute();
+    } else {
+        $countStmt = $pdo->query($countSql);
+    }
+    $total = $countStmt->fetchColumn();
+
+} catch (PDOException $e) {
+    // Fallback if status column doesn't exist
+    $sql = "SELECT * FROM found_items";
+    if (!empty($search)) {
+        $sql .= " WHERE title LIKE :search OR description LIKE :search";
+    }
+    $sql .= " ORDER BY created_at DESC LIMIT :start, :limit";
+
+    $stmt = $pdo->prepare($sql);
+    if (!empty($search)) {
+        $stmt->bindValue(':search', '%' . $search . '%', PDO::PARAM_STR);
+    }
+    $stmt->bindValue(':start', (int)$start, PDO::PARAM_INT);
+    $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+    $stmt->execute();
+    $items = $stmt->fetchAll();
+
+    $countSql = "SELECT COUNT(*) FROM found_items";
+    if (!empty($search)) {
+        $countSql .= " WHERE title LIKE :search OR description LIKE :search";
+        $countStmt = $pdo->prepare($countSql);
+        $countStmt->bindValue(':search', '%' . $search . '%', PDO::PARAM_STR);
+        $countStmt->execute();
+    } else {
+        $countStmt = $pdo->query($countSql);
+    }
+    $total = $countStmt->fetchColumn();
 }
-$total = $countStmt->fetchColumn();
+
 $pages = ceil($total / $limit);
 ?>
 
@@ -99,8 +139,8 @@ $pages = ceil($total / $limit);
                     <?php foreach ($items as $index => $item): ?>
                         <div class="item-card card animate-fade-in" style="animation-delay: <?= $index * 0.1 ?>s">
                             <div class="item-image">
-                                <?php if (!empty($item['image_path'])): ?>
-                                    <img src="<?= htmlspecialchars($item['image_path']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+                                <?php if (!empty($item['image_path']) && file_exists($item['image_path'])): ?>
+                                    <img src="<?= htmlspecialchars($item['image_path']) ?>" alt="<?= htmlspecialchars($item['title']) ?>" loading="lazy">
                                 <?php else: ?>
                                     <div class="placeholder-image">
                                         <span class="placeholder-icon">📷</span>
