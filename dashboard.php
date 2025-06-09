@@ -84,16 +84,16 @@ $claimedItems = $stmt->fetchColumn();
                         <div class="stat-value"><?= $totalItems ?></div>
                         <div class="stat-label">Active Items</div>
                     </div>
-                    <div class="stat-card">
+                    <!-- <div class="stat-card">
                         <div class="stat-icon">✅</div>
                         <div class="stat-value"><?= $claimedItems ?></div>
                         <div class="stat-label">Items Claimed</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">🏆</div>
+                        <div c  lass="stat-icon">🏆</div>
                         <div class="stat-value"><?= ($totalItems + $claimedItems) > 0 ? '👍' : '-' ?></div>
                         <div class="stat-label">Community Helper</div>
-                    </div>
+                    </div> -->
                 </div>
             </section>
 
@@ -165,6 +165,9 @@ $claimedItems = $stmt->fetchColumn();
                 <p class="footer-tagline">Helping our campus community reconnect with lost items</p>
                 <div class="footer-links">
                     <a href="index.php">Home</a>
+                    <a href="about.php">About</a>
+                    <a href="contact.php">Contact</a>
+                    <a href="privacy.php">Privacy Policy</a>
                 </div>
                 <p class="copyright">© <?= date('Y') ?> Campus Lost & Found. All rights reserved.</p>
             </div>

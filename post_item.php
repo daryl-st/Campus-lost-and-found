@@ -60,6 +60,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $success = "Item posted successfully!";
             // Clear form data
             $_POST = [];
+            header("Location: dashboard.php");
+        exit();
         } catch (PDOException $e) {
             $errors[] = "Database error: " . $e->getMessage();
         }
