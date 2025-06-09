@@ -1,0 +1,216 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background: #f9fafb;
+  color: #333;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 32px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: bold;
+  color: #2563eb;
+}
+a {
+  text-decoration: none;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.actions button,
+.cancel-btn,
+.submit-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.cancel-btn {
+  background: #e5e7eb;
+  color: #333;
+}
+.logout {
+  color: #555;
+  text-decoration: none;
+  padding: 6px 10px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+  border-radius: 6px;
+}
+
+.logout:hover,
+.cancel-btn:hover {
+  background-color: #2563eb;
+  color: #f3f4f6;
+}
+
+main {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+}
+
+.post-form {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  width: 400px;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.05);
+}
+
+.post-form h2 {
+  margin-bottom: 0;
+}
+
+.post-form .subtitle {
+  font-size: 14px;
+  color: #777;
+  margin-bottom: 20px;
+}
+
+.post-form label {
+  display: block;
+  margin: 12px 0 6px;
+  font-weight: 500;
+}
+
+.post-form input[type="text"],
+.post-form input[type="date"],
+.post-form input[type="datetime-local"],
+.post-form textarea,
+.post-form select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.post-form textarea {
+  resize: vertical;
+  height: 80px;
+}
+
+.upload-box {
+  border: 2px dashed #ccc;
+  border-radius: 6px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.upload-box input {
+  display: none;
+}
+
+.post-form .actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+/* Logout hover effect */
+.logout-link {
+  color: #333;
+  transition: color 0.2s ease;
+}
+
+.logout-link:hover {
+  color: #d9534f;
+}
+/* --- Additions for login.php page --- */
+.login-container {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  width: 400px;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.05);
+}
+
+.login-container h2 {
+  margin-bottom: 0;
+  text-align: center;
+  font-size: 24px;
+}
+
+.login-container .subtitle {
+  font-size: 14px;
+  color: #777;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.login-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-container label {
+  font-weight: 500;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.login-container input[type="text"],
+.login-container input[type="password"] {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 16px;
+}
+
+.login-container .password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  font-size: 14px;
+  color: #999;
+}
+
+.login-container .remember-me {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.login-container .submit-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.2s ease;
+}
+
+.login-container .submit-btn:hover {
+  background: #1d4ed8;
+}
+
+.login-container .links {
+  text-align: center;
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+.login-container .links a {
+  color: #2563eb;
+}
