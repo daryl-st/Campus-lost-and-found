@@ -165,9 +165,6 @@ $claimedItems = $stmt->fetchColumn();
                 <p class="footer-tagline">Helping our campus community reconnect with lost items</p>
                 <div class="footer-links">
                     <a href="index.php">Home</a>
-                    <a href="about.php">About</a>
-                    <a href="contact.php">Contact</a>
-                    <a href="privacy.php">Privacy Policy</a>
                 </div>
                 <p class="copyright">© <?= date('Y') ?> Campus Lost & Found. All rights reserved.</p>
             </div>

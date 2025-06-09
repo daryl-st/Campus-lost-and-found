@@ -3,8 +3,8 @@
 
 $host = "localhost";
 $dbname = "campus_lost_found";
-$username = "root"; // Change if needed
-$password = "";     // Change if needed
+$username = "campus"; // Change if needed
+$password = "campuslost";     // Change if needed
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
