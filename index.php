@@ -175,19 +175,13 @@ $pages = ceil($total / $limit);
         </section>
     </main>
 
-    <footer class="footer">
+ <footer class="footer">
         <div class="container">
             <div class="footer-content">
                 <div class="footer-logo">
                     <span class="logo-icon">🔍</span> Campus Lost & Found
                 </div>
                 <p class="footer-tagline">Helping our campus community reconnect with lost items</p>
-                <div class="footer-links">
-                    <a href="index.php">Home</a>
-                    <a href="about.php">About</a>
-                    <a href="contact.php">Contact</a>
-                    <a href="privacy.php">Privacy Policy</a>
-                </div>
                 <p class="copyright">© <?= date('Y') ?> Campus Lost & Found. All rights reserved.</p>
             </div>
         </div>

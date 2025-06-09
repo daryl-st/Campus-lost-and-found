@@ -306,13 +306,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                 </div>
             </div>
 
-            <div class="form-options">
+            <!-- <div class="form-options">
                 <div class="remember-me">
                     <input type="checkbox" id="remember" name="remember">
                     <label for="remember">Remember me</label>
                 </div>
                 <a href="forgot_password.php" class="forgot-link">Forgot password?</a>
-            </div>
+            </div> -->
 
             <button type="submit" name="login" class="submit-btn">Sign In</button>
         </form>
