@@ -634,8 +634,8 @@ $isOwner = isset($_SESSION['user_id']) && $_SESSION['user_id'] == $item['user_id
                         <h4>🔧 Item Management</h4>
                         <p>You are the owner of this item. You can edit, mark as found, or delete this listing.</p>
                         <div class="action-buttons">
-                            <a href="edit_item.php?id=<?= $item['id'] ?>" class="btn btn-edit btn-large">✏️ Edit Item</a>
-                            <button onclick="markAsFound()" class="btn btn-found btn-large">✅ Mark as Found</button>
+                            <!-- <a href="edit_item.php?id=<?= $item['id'] ?>" class="btn btn-edit btn-large">✏️ Edit Item</a> -->
+                            <!-- <button onclick="markAsFound()" class="btn btn-found btn-large">✅ Mark as Found</button> -->
                             <button onclick="confirmDelete()" class="btn btn-delete btn-large">🗑️ Delete Item</button>
                         </div>
                     </div>
@@ -647,7 +647,7 @@ $isOwner = isset($_SESSION['user_id']) && $_SESSION['user_id'] == $item['user_id
         <div class="action-buttons" style="margin-top: 30px;">
             <a href="index.php" class="btn btn-outline btn-large">← Back to Items</a>
             <?php if (isset($_SESSION['user_id']) && !$isOwner): ?>
-                <a href="mailto:<?= htmlspecialchars($item['email']) ?>?subject=Found Item: <?= htmlspecialchars($item['title']) ?>" class="btn btn-secondary btn-large">📧 Contact Owner</a>
+                <!-- <a href="mailto:<?= htmlspecialchars($item['email']) ?>?subject=Found Item: <?= htmlspecialchars($item['title']) ?>" class="btn btn-secondary btn-large">📧 Contact Owner</a> -->
             <?php endif; ?>
         </div>
     </main>

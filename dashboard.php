@@ -12,48 +12,23 @@ $success_message = $_SESSION['success_message'] ?? '';
 $error_message = $_SESSION['error_message'] ?? '';
 unset($_SESSION['success_message'], $_SESSION['error_message']);
 
-try {
-    // Check if status column exists, if not add it
-    $stmt = $pdo->query("SHOW COLUMNS FROM found_items LIKE 'status'");
-    if ($stmt->rowCount() == 0) {
-        // Add status column if it doesn't exist
-        $pdo->exec("ALTER TABLE found_items ADD COLUMN status ENUM('active', 'claimed', 'removed') DEFAULT 'active'");
-        $pdo->exec("UPDATE found_items SET status = 'active' WHERE status IS NULL");
-    }
+// Fetch user's posted items (only active ones)
+$stmt = $pdo->prepare("SELECT * FROM found_items WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC");
+$stmt->execute([$_SESSION['user_id']]);
+$userItems = $stmt->fetchAll();
 
-    // Fetch user's posted items (only active ones)
-    $stmt = $pdo->prepare("SELECT * FROM found_items WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC");
-    $stmt->execute([$_SESSION['user_id']]);
-    $userItems = $stmt->fetchAll();
+// Fetch recent items (not posted by the current user, only active ones)
+$stmt = $pdo->prepare("SELECT * FROM found_items WHERE user_id != ? AND status = 'active' ORDER BY created_at DESC LIMIT 5");
+$stmt->execute([$_SESSION['user_id']]);
+$recentItems = $stmt->fetchAll();
 
-    // Fetch recent items (not posted by the current user, only active ones)
-    $stmt = $pdo->prepare("SELECT * FROM found_items WHERE user_id != ? AND status = 'active' ORDER BY created_at DESC LIMIT 5");
-    $stmt->execute([$_SESSION['user_id']]);
-    $recentItems = $stmt->fetchAll();
+// Get stats
+$totalItems = count($userItems);
 
-    // Get stats
-    $totalItems = count($userItems);
-
-    // Get claimed items count
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM found_items WHERE user_id = ? AND status = 'claimed'");
-    $stmt->execute([$_SESSION['user_id']]);
-    $claimedItems = $stmt->fetchColumn();
-
-} catch (PDOException $e) {
-    // If there's still an error, fall back to queries without status
-    $stmt = $pdo->prepare("SELECT * FROM found_items WHERE user_id = ? ORDER BY created_at DESC");
-    $stmt->execute([$_SESSION['user_id']]);
-    $userItems = $stmt->fetchAll();
-
-    $stmt = $pdo->prepare("SELECT * FROM found_items WHERE user_id != ? ORDER BY created_at DESC LIMIT 5");
-    $stmt->execute([$_SESSION['user_id']]);
-    $recentItems = $stmt->fetchAll();
-
-    $totalItems = count($userItems);
-    $claimedItems = 0;
-    
-    $error_message = "Database schema needs updating. Please run the database migration.";
-}
+// Get claimed items count
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM found_items WHERE user_id = ? AND status = 'claimed'");
+$stmt->execute([$_SESSION['user_id']]);
+$claimedItems = $stmt->fetchColumn();
 ?>
 
 <!DOCTYPE html>
@@ -90,9 +65,6 @@ try {
         <?php if ($error_message): ?>
             <div class="error-alert">
                 <p><?= htmlspecialchars($error_message) ?></p>
-                <?php if (strpos($error_message, 'schema') !== false): ?>
-                    <p><a href="check_database.php" style="color: #c53030; text-decoration: underline;">Click here to fix database schema</a></p>
-                <?php endif; ?>
             </div>
         <?php endif; ?>
 
@@ -136,10 +108,7 @@ try {
                         <span class="action-icon">🔍</span>
                         <span class="action-text">Browse Items</span>
                     </a>
-                    <a href="profile.php" class="action-btn">
-                        <span class="action-icon">👤</span>
-                        <span class="action-text">Edit Profile</span>
-                    </a>
+                   
                 </div>
             </section>
 
@@ -183,42 +152,7 @@ try {
                 <?php endif; ?>
             </section>
 
-            <section class="recent-items-section card">
-                <h2 class="section-title">Recent Found Items</h2>
-                
-                <?php if (count($recentItems) > 0): ?>
-                <div class="recent-items-list">
-                    <?php foreach ($recentItems as $item): ?>
-                    <div class="recent-item">
-                        <div class="recent-item-content">
-                            <h3><?= htmlspecialchars($item['title']) ?></h3>
-                            <p><?= htmlspecialchars(substr($item['description'], 0, 80)) . (strlen($item['description']) > 80 ? '...' : '') ?></p>
-                            <div class="item-meta">
-                                <span class="location-tag">
-                                    <span class="meta-icon">📍</span>
-                                    <?= htmlspecialchars($item['location']) ?>
-                                </span>
-                                <span class="date-tag">
-                                    <span class="meta-icon">📅</span>
-                                    <?= date('M j, Y', strtotime($item['found_datetime'])) ?>
-                                </span>
-                            </div>
-                        </div>
-                        <a href="item_detail.php?id=<?= $item['id'] ?>" class="view-item-btn">View</a>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-                <div class="view-all-link">
-                    <a href="index.php">View all found items →</a>
-                </div>
-                <?php else: ?>
-                <div class="empty-state">
-                    <div class="empty-icon">🔍</div>
-                    <h3>No Recent Items</h3>
-                    <p>There are no recent items posted by others</p>
-                </div>
-                <?php endif; ?>
-            </section>
+         
         </div>
     </main>
 
